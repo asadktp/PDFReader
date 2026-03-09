@@ -63,6 +63,19 @@ class _HomeScreenState extends State<HomeScreen> {
     ).then((_) => _loadHistory());
   }
 
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,43 +184,105 @@ class _HomeScreenState extends State<HomeScreen> {
                                 itemCount: _history.length,
                                 itemBuilder: (context, index) {
                                   final item = _history[index];
-                                  return Card(
-                                    elevation: 0,
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: BorderSide(
-                                        color: Colors.grey.shade200,
+                                  return Dismissible(
+                                    key: Key(item.path),
+                                    direction: DismissDirection.endToStart,
+                                    background: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: const EdgeInsets.only(right: 20),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade400,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                    child: ListTile(
-                                      leading: const Icon(
-                                        Icons.description_outlined,
-                                        color: Colors.red,
-                                      ),
-                                      title: Text(
-                                        item.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        'Opened ${item.lastOpened.hour}:${item.lastOpened.minute.toString().padLeft(2, '0')}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                      trailing: const Icon(
-                                        Icons.chevron_right,
-                                        size: 20,
-                                      ),
-                                      onTap: () => _openPDF(
-                                        context,
+                                    onDismissed: (direction) async {
+                                      final removedItem = item;
+                                      await _historyService.removeFromHistory(
                                         item.path,
-                                        item.name,
+                                      );
+                                      setState(() {
+                                        _history.removeAt(index);
+                                      });
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Removed ${removedItem.name}',
+                                            ),
+                                            action: SnackBarAction(
+                                              label: 'Undo',
+                                              onPressed: () async {
+                                                await _historyService
+                                                    .addToHistory(
+                                                      removedItem.path,
+                                                      removedItem.name,
+                                                    );
+                                                _loadHistory();
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Card(
+                                      elevation: 0,
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        side: BorderSide(
+                                          color: Colors.grey.shade200,
+                                        ),
+                                      ),
+                                      child: ListTile(
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 4,
+                                            ),
+                                        leading: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.description_rounded,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                        title: Text(
+                                          item.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          'Last opened: ${_formatDate(item.lastOpened)}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        trailing: const Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: Colors.grey,
+                                        ),
+                                        onTap: () => _openPDF(
+                                          context,
+                                          item.path,
+                                          item.name,
+                                        ),
                                       ),
                                     ),
                                   );

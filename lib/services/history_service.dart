@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PDFHistoryItem {
@@ -30,13 +31,26 @@ class HistoryService {
   static const int _maxItems = 10;
 
   Future<List<PDFHistoryItem>> getHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? historyJson = prefs.getString(_key);
-    if (historyJson == null) return [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? historyJson = prefs.getString(_key);
+      if (historyJson == null) return [];
 
-    final List<dynamic> decoded = jsonDecode(historyJson);
-    return decoded.map((item) => PDFHistoryItem.fromJson(item)).toList()
-      ..sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
+      final List<dynamic> decoded = jsonDecode(historyJson);
+      return decoded.map((item) => PDFHistoryItem.fromJson(item)).toList()
+        ..sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
+    } catch (e) {
+      debugPrint('Error loading history: $e');
+      return [];
+    }
+  }
+
+  Future<void> removeFromHistory(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<PDFHistoryItem> history = await getHistory();
+    history.removeWhere((item) => item.path == path);
+    final String encoded = jsonEncode(history.map((e) => e.toJson()).toList());
+    await prefs.setString(_key, encoded);
   }
 
   Future<void> addToHistory(String path, String name) async {

@@ -21,6 +21,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
   PdfTextSearchResult _searchResult = PdfTextSearchResult();
   bool _isSearching = false;
+  bool _isNightMode = false;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -30,25 +31,37 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   }
 
   void _showGoToPageDialog() {
+    if (_pdfViewerController.pageCount == 0) return;
     final TextEditingController pageController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Go to Page'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         content: TextField(
           controller: pageController,
           keyboardType: TextInputType.number,
+          autofocus: true,
           decoration: InputDecoration(
-            hintText:
-                'Enter page number (1 - ${_pdfViewerController.pageCount})',
+            hintText: '1 - ${_pdfViewerController.pageCount}',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
+          onSubmitted: (value) {
+            final int? page = int.tryParse(value);
+            if (page != null &&
+                page > 0 &&
+                page <= _pdfViewerController.pageCount) {
+              _pdfViewerController.jumpToPage(page);
+              Navigator.pop(context);
+            }
+          },
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               final int? page = int.tryParse(pageController.text);
               if (page != null &&
@@ -58,6 +71,11 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 Navigator.pop(context);
               }
             },
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             child: const Text('Go'),
           ),
         ],
@@ -74,14 +92,22 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 controller: _searchController,
                 autofocus: true,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search...',
-                  hintStyle: TextStyle(color: Colors.white70),
+                  hintStyle: const TextStyle(color: Colors.white70),
                   border: InputBorder.none,
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.clear, color: Colors.white70),
+                    onPressed: () => _searchController.clear(),
+                  ),
                 ),
                 onSubmitted: (value) async {
-                  _searchResult = await _pdfViewerController.searchText(value);
-                  setState(() {});
+                  if (value.isNotEmpty) {
+                    _searchResult = await _pdfViewerController.searchText(
+                      value,
+                    );
+                    setState(() {});
+                  }
                 },
               )
             : Text(
@@ -89,17 +115,33 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 style: const TextStyle(fontSize: 16),
                 overflow: TextOverflow.ellipsis,
               ),
-        backgroundColor: Colors.blue.shade800,
+        backgroundColor: _isNightMode ? Colors.black : Colors.blue.shade800,
         foregroundColor: Colors.white,
         actions: [
           if (_isSearching) ...[
+            if (_searchResult.hasResult)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Center(
+                  child: Text(
+                    '${_searchResult.currentInstanceIndex}/${_searchResult.totalInstanceCount}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
             IconButton(
               icon: const Icon(Icons.navigate_before),
-              onPressed: () => _searchResult.previousInstance(),
+              onPressed: () {
+                _searchResult.previousInstance();
+                setState(() {});
+              },
             ),
             IconButton(
               icon: const Icon(Icons.navigate_next),
-              onPressed: () => _searchResult.nextInstance(),
+              onPressed: () {
+                _searchResult.nextInstance();
+                setState(() {});
+              },
             ),
             IconButton(
               icon: const Icon(Icons.close),
@@ -120,6 +162,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               icon: const Icon(Icons.tag),
               onPressed: _showGoToPageDialog,
             ),
+            IconButton(
+              icon: Icon(_isNightMode ? Icons.light_mode : Icons.dark_mode),
+              onPressed: () => setState(() => _isNightMode = !_isNightMode),
+            ),
             PopupMenuButton<double>(
               icon: const Icon(Icons.zoom_in),
               onSelected: (value) => _pdfViewerController.zoomLevel = value,
@@ -133,11 +179,23 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
           ],
         ],
       ),
-      body: SfPdfViewer.file(
-        File(widget.filePath),
-        controller: _pdfViewerController,
-        key: _pdfViewerKey,
-        enableTextSelection: true,
+      body: ColorFiltered(
+        colorFilter: ColorFilter.matrix(
+          _isNightMode
+              ? [
+                  -1, 0, 0, 0, 255, // R
+                  0, -1, 0, 0, 255, // G
+                  0, 0, -1, 0, 255, // B
+                  0, 0, 0, 1, 0, // A
+                ]
+              : [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0],
+        ),
+        child: SfPdfViewer.file(
+          File(widget.filePath),
+          controller: _pdfViewerController,
+          key: _pdfViewerKey,
+          enableTextSelection: true,
+        ),
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
