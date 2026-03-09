@@ -86,9 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.blue.shade900,
-              Colors.blue.shade700,
-              Colors.blue.shade500,
+              Colors.red.shade900,
+              Colors.red.shade700,
+              Colors.red.shade500,
             ],
           ),
         ),
@@ -103,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Offline PDF Reader',
+                'KTP PDF Reader',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -114,14 +114,14 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 40),
               ElevatedButton.icon(
                 onPressed: () => _pickPDF(context),
-                icon: const Icon(Icons.file_open_rounded, color: Colors.blue),
+                icon: const Icon(Icons.file_open_rounded, color: Colors.red),
                 label: const Text(
                   'Open New PDF',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: Colors.blue.shade800,
+                  foregroundColor: Colors.red.shade800,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 40,
                     vertical: 16,

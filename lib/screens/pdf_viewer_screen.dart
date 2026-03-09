@@ -1,6 +1,13 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:pdf_render/pdf_render.dart' as render;
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 class PDFViewerScreen extends StatefulWidget {
   final String filePath;
@@ -72,6 +79,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -81,6 +90,131 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _exportToJpg() async {
+    if (_pdfViewerController.pageCount == 0) return;
+
+    final TextEditingController pageController = TextEditingController(
+      text: _pdfViewerController.pageNumber.toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Page as JPG'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter page number to export:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pageController,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: '1 - ${_pdfViewerController.pageCount}',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final int? pageNum = int.tryParse(pageController.text);
+              if (pageNum != null &&
+                  pageNum > 0 &&
+                  pageNum <= _pdfViewerController.pageCount) {
+                Navigator.pop(context);
+                await _processExport(pageNum);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid page number')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Export'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _processExport(int pageNumber) async {
+    try {
+      // Request permissions
+      if (Platform.isAndroid) {
+        if (!await Permission.storage.request().isGranted &&
+            !await Permission.manageExternalStorage.request().isGranted) {
+          // On Android 13+, storage permission might be denied but photos might work
+          // or we can just proceed and see if gallery saver handles it.
+        }
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final doc = await render.PdfDocument.openFile(widget.filePath);
+      final page = await doc.getPage(pageNumber);
+
+      final pageImage = await page.render(
+        fullWidth: page.width * 4,
+        fullHeight: page.height * 4,
+      );
+
+      final img = await pageImage.createImageDetached();
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      final pngBytes = byteData!.buffer.asUint8List();
+
+      final result = await ImageGallerySaver.saveImage(
+        pngBytes,
+        quality: 100,
+        name:
+            "KTP_PDF_${p.basenameWithoutExtension(widget.filePath)}_page_$pageNumber",
+      );
+
+      Navigator.pop(context); // Close loading dialog
+
+      if (result['isSuccess']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Page $pageNumber exported to gallery successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception(result['errorMessage'] ?? 'Failed to save image');
+      }
+
+      await doc.dispose();
+    } catch (e) {
+      if (Navigator.canPop(context)) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error exporting page: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -115,7 +249,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 style: const TextStyle(fontSize: 16),
                 overflow: TextOverflow.ellipsis,
               ),
-        backgroundColor: _isNightMode ? Colors.black : Colors.blue.shade800,
+        backgroundColor: _isNightMode ? Colors.black : Colors.red.shade800,
         foregroundColor: Colors.white,
         actions: [
           if (_isSearching) ...[
@@ -175,6 +309,11 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 const PopupMenuItem(value: 2.0, child: Text('200%')),
                 const PopupMenuItem(value: 3.0, child: Text('300%')),
               ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.image_outlined),
+              tooltip: 'Export Page as JPG',
+              onPressed: _exportToJpg,
             ),
           ],
         ],

@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:pdf_reader/main.dart';
+import 'package:ktp_pdf_reader/main.dart';
 
 void main() {
   testWidgets('App loads and shows title', (WidgetTester tester) async {
@@ -16,7 +16,7 @@ void main() {
     await tester.pumpWidget(const PDFReaderApp());
 
     // Verify that our app title is present.
-    expect(find.text('Offline PDF Reader'), findsOneWidget);
+    expect(find.text('KTP PDF Reader'), findsOneWidget);
     expect(find.byIcon(Icons.picture_as_pdf_rounded), findsOneWidget);
   });
 }
